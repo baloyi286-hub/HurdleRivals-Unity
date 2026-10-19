@@ -1,4 +1,4 @@
-name: Build Hurdle Rivals
+name: Unity CLI Builds
 on:
   push:
     branches: [main]
@@ -8,39 +8,50 @@ permissions:
   contents: read
 jobs:
   build:
-    name: Unity ${{ matrix.targetPlatform }}
+    name: Unity CLI / ${{ matrix.targetPlatform }}
     runs-on: ubuntu-latest
+    timeout-minutes: 90
     strategy:
       fail-fast: false
       matrix:
         include:
           - targetPlatform: Android
-            buildTarget: Android
             buildOutput: Builds/Android/HurdleRivals.apk
-            artifactName: HurdleRivals-AndroidTV-APK
+            artifactName: HurdleRivals-AndroidTV
           - targetPlatform: StandaloneLinux64
-            buildTarget: StandaloneLinux64
-            buildOutput: Builds/StandaloneLinux64/HurdleRivals.x86_64
-            artifactName: HurdleRivals-Linux-Unity
+            buildOutput: Builds/Linux/HurdleRivals.x86_64
+            artifactName: HurdleRivals-Linux
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/cache@v4
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Verify Unity project
+        shell: bash
+        run: |
+          test -f ProjectSettings/ProjectVersion.txt
+          test -f Packages/manifest.json
+          test -f Assets/Editor/CIBuilder.cs
+          test -f Assets/Scripts/RaceBootstrap.cs
+      - name: Cache Unity Library
+        uses: actions/cache@v4
         with:
           path: Library
-          key: Library-${{ matrix.targetPlatform }}-${{ hashFiles('Packages/**', 'ProjectSettings/**') }}
-      - name: Build Unity player
+          key: unity-${{ matrix.targetPlatform }}-${{ hashFiles('Packages/**', 'ProjectSettings/**', 'Assets/**/*.cs') }}
+      - name: Unity batchmode build
         uses: game-ci/unity-builder@v4
         env:
           UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
           UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
-          BUILD_TARGET: ${{ matrix.buildTarget }}
+          UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
+          BUILD_TARGET: ${{ matrix.targetPlatform }}
           BUILD_OUTPUT: ${{ matrix.buildOutput }}
         with:
           unityVersion: 6000.0.35f1
           targetPlatform: ${{ matrix.targetPlatform }}
           buildMethod: HurdleRivals.Editor.CIBuilder.Build
-      - uses: actions/upload-artifact@v4
+          versioning: None
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifactName }}
           path: ${{ matrix.buildOutput }}
