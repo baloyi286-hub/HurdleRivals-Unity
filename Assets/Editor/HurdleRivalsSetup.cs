@@ -1,4 +1,5 @@
 #if UNITY_EDITOR
+using System.IO;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
@@ -10,10 +11,16 @@ namespace HurdleRivals.Editor
         [MenuItem("Hurdle Rivals/Configure Project")]
         public static void Configure()
         {
-            System.IO.Directory.CreateDirectory("Assets/Scenes");
-            var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
-            EditorSceneManager.SaveScene(scene, "Assets/Scenes/Race.unity");
-            EditorBuildSettings.scenes = new[] { new EditorBuildSettingsScene("Assets/Scenes/Race.unity", true) };
+            const string path = "Assets/Scenes/Race.unity";
+            Directory.CreateDirectory("Assets/Scenes");
+            if (!File.Exists(path))
+            {
+                var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+                var root = new GameObject("Hurdle Rivals Bootstrap");
+                root.AddComponent<HurdleRivals.Runtime.RaceBootstrap>();
+                EditorSceneManager.SaveScene(scene, path);
+            }
+            EditorBuildSettings.scenes = new[] { new EditorBuildSettingsScene(path, true) };
             PlayerSettings.productName = "Hurdle Rivals";
             PlayerSettings.companyName = "Hurdle Rivals";
             PlayerSettings.SetApplicationIdentifier(NamedBuildTarget.Android, "com.hurdlerivals.tv");
