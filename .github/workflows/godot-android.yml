@@ -45,12 +45,19 @@ jobs:
       - name: Create debug signing key
         run: |
           keytool -genkeypair -v -keystore debug.keystore -alias androiddebugkey -keyalg RSA -keysize 2048 -validity 10000 -storepass android -keypass android -dname "CN=Android Debug,O=Hurdle Rivals,C=ZA"
+      - name: Configure Godot Android SDK
+        run: |
+          mkdir -p "$HOME/.config/godot"
+          printf '[gd_resource type="EditorSettings" format=3]\n\n[resource]\nexport/android/android_sdk_path = "%s"\nexport/android/java_sdk_path = "%s"\n' "$ANDROID_HOME" "$JAVA_HOME" > "$HOME/.config/godot/editor_settings-4.4.tres"
+          test -d "$ANDROID_HOME/platforms/android-35"
       - name: Import project and check scripts
-        run: godot --headless --path . --editor --import --quit
+        run: godot --headless --verbose --path . --editor --import --quit
       - name: Export Android APK
         run: |
           mkdir -p build
-          godot --headless --path . --install-android-build-template --export-debug Android build/HurdleRivals.apk
+          godot --headless --path . --install-android-build-template
+          test -f android/build/build.gradle || (echo "Missing Godot Android Gradle template" && exit 1)
+          godot --headless --verbose --path . --export-debug Android build/HurdleRivals.apk
           test -s build/HurdleRivals.apk
       - uses: actions/upload-artifact@v4
         with:
