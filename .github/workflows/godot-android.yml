@@ -50,7 +50,7 @@ jobs:
       - name: Export Android APK
         run: |
           mkdir -p build
-          godot --headless --path . --export-debug Android build/HurdleRivals.apk
+          godot --headless --path . --install-android-build-template --export-debug Android build/HurdleRivals.apk
           test -s build/HurdleRivals.apk
       - uses: actions/upload-artifact@v4
         with:
