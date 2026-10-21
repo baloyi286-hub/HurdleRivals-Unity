@@ -2,12 +2,6 @@ name: Godot Android TV APK
 on:
   push:
     branches: [main]
-    paths:
-      - 'project.godot'
-      - 'export_presets.cfg'
-      - 'scenes/**'
-      - 'scripts/**'
-      - '.github/workflows/godot-android.yml'
   pull_request:
   workflow_dispatch:
 permissions:
