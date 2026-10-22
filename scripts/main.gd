@@ -51,7 +51,10 @@ func _build_world() -> void:
         reparent_viewport(viewport, container)
         var world := Node3D.new()
         viewport.add_child(world)
-        _add_mesh(world, "Track", Vector3(0, -0.2, 125), Vector3(13, 0.3, 270), Color(0.19, 0.61, 0.33))
+        _add_mesh(world, "Track", Vector3(0, -0.2, 125), Vector3(13, 0.3, 270), Color(0.96, 0.35, 0.12))
+        for lane in range(-5, 7, 2):
+            _add_mesh(world, "LaneLine", Vector3(float(lane), -0.035, 125), Vector3(0.08, 0.025, 270), Color(1, 0.97, 0.84))
+        _add_mesh(world, "Infield", Vector3(-17, -0.2, 125), Vector3(20, 0.3, 270), Color(0.23, 0.68, 0.27))
         for z in range(14, 240, 14):
             _add_mesh(world, "Hurdle", Vector3(0, 0.7, z), Vector3(10, 1.4, 0.3), Color(1, 0.76, 0.14))
         _add_mesh(world, "Finish", Vector3(0, 0.04, FINISH_Z), Vector3(13, 0.1, 1), Color.WHITE)
