@@ -53,9 +53,10 @@ jobs:
       - name: Import project and check scripts
         run: godot --headless --verbose --path . --editor --import --quit
       - name: Export Android APK
+        timeout-minutes: 15
         run: |
           mkdir -p build
-          godot --headless --path . --install-android-build-template
+          godot --headless --path . --editor --install-android-build-template --quit
           test -f android/build/build.gradle || (echo "Missing Godot Android Gradle template" && exit 1)
           godot --headless --verbose --path . --export-debug Android build/HurdleRivals.apk
           test -s build/HurdleRivals.apk
