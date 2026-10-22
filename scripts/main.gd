@@ -206,8 +206,8 @@ func _build_runner(runner: Node3D, index: int) -> void:
 func _animate_runner(index: int) -> void:
     var racer_index: int = index if index < 2 else 3 - index
     var now := Time.get_ticks_msec() / 1000.0
-    var fallen := now < stun_until[racer_index]
-    var running := winner < 0 and race_clock >= start_delay and not fallen
+    var fallen: bool = now < float(stun_until[racer_index])
+    var running: bool = winner < 0 and race_clock >= start_delay and not fallen
     var airborne := racers[racer_index].position.y > 1.15
     var phase: float = race_clock * 16.0 + float(racer_index) * 1.2
     var stride: float = sin(phase)
@@ -397,7 +397,7 @@ func _process(delta: float) -> void:
     var now := Time.get_ticks_msec() / 1000.0
     for i in range(2):
         var runner := racers[i]
-        var fallen := now < stun_until[i]
+        var fallen: bool = now < float(stun_until[i])
         if winner < 0 and not fallen:
             var steering := Input.get_axis("p%d_left" % (i + 1), "p%d_right" % (i + 1))
             steering += float(peers.get(i, {}).get("steer", 0))
@@ -451,7 +451,7 @@ func _knock_down(index: int, now: float) -> void:
     race_hits[index] += 1
 
 func _pose_fall(runner: Node3D, index: int, now: float) -> void:
-    var elapsed := now - fall_started[index]
+    var elapsed: float = now - float(fall_started[index])
     if elapsed >= 0.0 and elapsed < FALL_DURATION:
         var down := smoothstep(0.0, 0.25, elapsed) * (1.0 - smoothstep(FALL_DURATION - 0.75, FALL_DURATION, elapsed))
         runner.rotation.z = down * (1.3 if index == 0 else -1.3)
