@@ -24,6 +24,10 @@ var legs: Array = []
 var arms: Array = []
 var dust: Array[GPUParticles3D] = []
 var race_hits := [0, 0]
+var race_worlds: Array[Node3D] = []
+var rival_visuals: Array[Node3D] = []
+var fall_started := [-100.0, -100.0]
+const FALL_DURATION := 2.6
 var player_names := ["JOHN", "MARY"]
 var hud: Label
 var finish_label: Label
@@ -66,6 +70,7 @@ func _build_world() -> void:
         reparent_viewport(viewport, container)
         var world := Node3D.new()
         viewport.add_child(world)
+        race_worlds.append(world)
         _add_mesh(world, "Track", Vector3(0, -0.2, 125), Vector3(18, 0.3, 270), Color(0.98, 0.37, 0.16))
         for lane in range(-5, 7, 2):
             _add_mesh(world, "LaneLine", Vector3(float(lane), -0.035, 125), Vector3(0.08, 0.025, 270), Color(1, 0.97, 0.84))
@@ -98,6 +103,14 @@ func _build_world() -> void:
         env.ambient_light_color = Color.WHITE
         environment.environment = env
         world.add_child(environment)
+    # Each camera renders its own copy of the same two shared racer positions.
+    # The simulation uses racers[0] and racers[1] as the authoritative state.
+    for i in range(2):
+        var rival := Node3D.new()
+        rival.name = "RivalRunner"
+        race_worlds[i].add_child(rival)
+        _build_runner(rival, 1 - i)
+        rival_visuals.append(rival)
 
 func reparent_viewport(viewport: SubViewport, container: SubViewportContainer) -> void:
     viewport.reparent(container)
@@ -155,8 +168,9 @@ func _build_runner(runner: Node3D, index: int) -> void:
     arms.append(runner_arms)
 
 func _animate_runner(index: int) -> void:
-    var running := winner < 0 and race_clock >= start_delay
-    var phase := race_clock * 15.0 + float(index) * 1.2
+    var racer_index := index % 2 if index < 2 else 1 - (index - 2)
+    var running := winner < 0 and race_clock >= start_delay and Time.get_ticks_msec() / 1000.0 >= stun_until[racer_index]
+    var phase := race_clock * 15.0 + float(racer_index) * 1.2
     for side in range(2):
         var direction := 1.0 if side == 0 else -1.0
         legs[index][side].rotation.x = sin(phase) * 0.7 * direction if running else 0.0
@@ -292,7 +306,10 @@ func _begin_race() -> void:
         velocities[i] = 0
         stun_until[i] = 0
         race_hits[i] = 0
-    finish_label.text = ""
+        obstacle_last[i] = -100.0
+        fall_started[i] = -100.0
+        peers[i] = {"steer": 0}
+    finish_label = ""
 
 func _unhandled_input(event: InputEvent) -> void:
     if not race_started and (event.is_action_pressed("ui_accept") or event.is_action_pressed("ui_select")):
@@ -306,46 +323,86 @@ func _update_connection_label() -> void:
 func _process(delta: float) -> void:
     _poll_network()
     if not race_started:
+        _sync_rival_views()
         return
     race_clock += delta
     if race_clock < start_delay:
         var countdown := int(ceil(start_delay - race_clock))
         for label in status_labels:
             label.text = str(countdown) if countdown > 1 else "GO!"
+        _sync_rival_views()
         return
+    var now := Time.get_ticks_msec() / 1000.0
     for i in range(2):
         var runner := racers[i]
-        if winner < 0 and Time.get_ticks_msec() / 1000.0 >= stun_until[i]:
+        var fallen := now < stun_until[i]
+        if winner < 0 and not fallen:
             var steering := Input.get_axis("p%d_left" % (i + 1), "p%d_right" % (i + 1))
             steering += float(peers.get(i, {}).get("steer", 0))
-            steering = clampf(steering, -1, 1)
+            steering = clampf(steering, -1.0, 1.0)
             if _action_pressed(i, "jump") and runner.position.y <= 1.01:
                 velocities[i] = JUMP_SPEED
             velocities[i] -= GRAVITY * delta
             runner.position.y = maxf(1.0, runner.position.y + velocities[i] * delta)
-            if runner.position.y <= 1:
-                velocities[i] = 0
-            runner.position.x = clampf(runner.position.x + steering * STEER_SPEED * delta, -5, 5)
+            if runner.position.y <= 1.0:
+                velocities[i] = 0.0
+            runner.position.x = clampf(runner.position.x + steering * STEER_SPEED * delta, -5.0, 5.0)
             runner.position.z += RUN_SPEED * delta
-            if _action_pressed(i, "push") and Time.get_ticks_msec() / 1000.0 > push_cooldown[i]:
-                push_cooldown[i] = Time.get_ticks_msec() / 1000.0 + 2
+            if _action_pressed(i, "push") and now > push_cooldown[i]:
+                push_cooldown[i] = now + 1.8
                 var other := 1 - i
-                if runner.position.distance_to(racers[other].position) < 2.5:
-                    stun_until[other] = Time.get_ticks_msec() / 1000.0 + 1.2
-            var nearest := roundf((runner.position.z - 14) / 14) * 14 + 14
-            if absf(nearest - runner.position.z) < 0.28 and absf(nearest - obstacle_last[i]) > 1 and runner.position.y < 2.4:
+                var separation := runner.position - racers[other].position
+                var horizontal_distance := Vector2(separation.x, separation.z).length()
+                if horizontal_distance < 2.8 and absf(separation.y) < 1.4 and now >= stun_until[other]:
+                    _knock_down(other, now)
+            var nearest := roundf(runner.position.z / 14.0) * 14.0
+            if nearest >= 14.0 and absf(nearest - runner.position.z) < 0.3 and absf(nearest - obstacle_last[i]) > 1.0:
                 obstacle_last[i] = nearest
-                stun_until[i] = Time.get_ticks_msec() / 1000.0 + 1.1
-                race_hits[i] += 1
+                # Hurdles occupy four lanes; steering between them is possible.
+                var hits_barrier := false
+                for lane_x in [-4.5, -1.5, 1.5, 4.5]:
+                    if absf(runner.position.x - lane_x) < 1.15:
+                        hits_barrier = true
+                        break
+                if hits_barrier and runner.position.y < 2.15:
+                    _knock_down(i, now)
             if runner.position.z >= FINISH_Z:
                 winner = i
                 finish_label.text = "%s WINS!" % player_names[i]
                 intro_panel.visible = true
+                start_button_ref.grab_focus.call_deferred()
+        elif fallen:
+            velocities[i] = 0.0
         _animate_runner(i)
+        _pose_fall(runner, i, now)
         cameras[i].position = runner.position + Vector3(0, 3.1, -7.8)
         cameras[i].look_at(runner.position + Vector3(0, 1.25, 10), Vector3.UP)
-        status_labels[i].text = "%dm  •  %d hits" % [int(FINISH_Z - runner.position.z), race_hits[i]]
+        status_labels[i].text = "FALLEN! GETTING UP" if fallen else "%dm  •  %d falls" % [maxi(0, int(FINISH_Z - runner.position.z)), race_hits[i]]
+    _sync_rival_views()
 
+func _knock_down(index: int, now: float) -> void:
+    if now < stun_until[index]:
+        return
+    fall_started[index] = now
+    stun_until[index] = now + FALL_DURATION
+    velocities[index] = 0.0
+    race_hits[index] += 1
+
+func _pose_fall(runner: Node3D, index: int, now: float) -> void:
+    var elapsed := now - fall_started[index]
+    if elapsed >= 0.0 and elapsed < FALL_DURATION:
+        var down := smoothstep(0.0, 0.25, elapsed) * (1.0 - smoothstep(FALL_DURATION - 0.75, FALL_DURATION, elapsed))
+        runner.rotation.z = down * (1.3 if index == 0 else -1.3)
+        runner.position.y = 1.0 - down * 0.58
+    else:
+        runner.rotation.z = 0.0
+
+func _sync_rival_views() -> void:
+    for i in range(2):
+        var rival_index := 1 - i
+        rival_visuals[i].transform = racers[rival_index].transform
+        # The rival is animated with the same state as the authoritative runner.
+        _animate_runner(i + 2)
 
 func _action_pressed(i: int, action: String) -> bool:
     var pressed := Input.is_action_just_pressed("p%d_%s" % [i + 1, action])
