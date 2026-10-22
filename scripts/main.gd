@@ -152,7 +152,7 @@ func _build_runner(runner: Node3D, index: int) -> void:
     var shirt := Color(0.11, 0.14, 0.19) if index == 0 else Color(0.98, 0.45, 0.18)
     var shorts := Color(0.1, 0.11, 0.14) if index == 0 else Color(0.35, 0.18, 0.34)
     var hair := Color(0.22, 0.13, 0.08) if index == 0 else Color(0.2, 0.14, 0.38)
-    var rig := Node3D.new()
+    var rig: Node3D = Node3D.new()
     rig.name = "CharacterRig"
     runner.add_child(rig)
     body_pivots.append(rig)
@@ -164,7 +164,7 @@ func _build_runner(runner: Node3D, index: int) -> void:
     for x in [-0.29, -0.14, 0.0, 0.14, 0.29]:
         _sphere(rig, "HairTuft", Vector3(x, 1.44 + 0.09 * cos(x * 6.0), 0.02), Vector3(0.14, 0.15, 0.17), hair)
     for side in [-1, 1]:
-        var sx := float(side)
+        var sx: float = float(side)
         _sphere(rig, "Ear", Vector3(sx * 0.43, 1.04, 0), Vector3(0.11, 0.16, 0.1), skin)
         _sphere(rig, "Eye", Vector3(sx * 0.18, 1.1, 0.355), Vector3(0.08, 0.09, 0.045), Color(0.13, 0.12, 0.13))
         _sphere(rig, "Brow", Vector3(sx * 0.18, 1.24, 0.355), Vector3(0.12, 0.04, 0.045), hair)
@@ -175,7 +175,7 @@ func _build_runner(runner: Node3D, index: int) -> void:
     var runner_knees := []
     var runner_elbows := []
     for side in [-1, 1]:
-        var sx := float(side)
+        var sx: float = float(side)
         var hip := Node3D.new()
         hip.position = Vector3(sx * 0.23, -0.48, 0)
         rig.add_child(hip)
@@ -204,14 +204,14 @@ func _build_runner(runner: Node3D, index: int) -> void:
     elbows.append(runner_elbows)
 
 func _animate_runner(index: int) -> void:
-    var racer_index := index if index < 2 else 3 - index
+    var racer_index: int = index if index < 2 else 3 - index
     var now := Time.get_ticks_msec() / 1000.0
     var fallen := now < stun_until[racer_index]
     var running := winner < 0 and race_clock >= start_delay and not fallen
     var airborne := racers[racer_index].position.y > 1.15
-    var phase := race_clock * 16.0 + float(racer_index) * 1.2
-    var stride := sin(phase)
-    var torso := body_pivots[index]
+    var phase: float = race_clock * 16.0 + float(racer_index) * 1.2
+    var stride: float = sin(phase)
+    var torso: Node3D = body_pivots[index]
     torso.position.y = absf(stride) * 0.065 if running and not airborne else 0.0
     torso.rotation.x = -0.15 if running else 0.0
     torso.rotation.y = sin(phase) * 0.07 if running else 0.0
