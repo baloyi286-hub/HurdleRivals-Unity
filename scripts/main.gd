@@ -32,13 +32,17 @@ var peers: Dictionary = {}
 var websocket_peers: Dictionary = {}
 var http_peers: Dictionary = {}
 var port := 8765
-var local_ip := "127.0.0.1"
+var local_ip := "192.168.0.249"
+var start_button_ref: Button
+var instructions_label: Label
 
 func _ready() -> void:
     _build_world()
     _build_hud()
     _start_server()
+    _update_connection_label()
     race_started = false
+    start_button_ref.grab_focus.call_deferred()
 
 func _build_world() -> void:
     var viewport_width := 1920
@@ -264,10 +268,13 @@ func _build_hud() -> void:
     instructions.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
     instructions.add_theme_font_size_override("font_size", 26)
     layout.add_child(instructions)
+    instructions_label = instructions
     var start_button := Button.new()
     start_button.text = "START RACE"
     start_button.custom_minimum_size = Vector2(500, 100)
     start_button.add_theme_font_size_override("font_size", 42)
+    start_button.focus_mode = Control.FOCUS_ALL
+    start_button_ref = start_button
     start_button.pressed.connect(_begin_race)
     layout.add_child(start_button)
     finish_label = Label.new()
@@ -286,6 +293,15 @@ func _begin_race() -> void:
         stun_until[i] = 0
         race_hits[i] = 0
     finish_label.text = ""
+
+func _unhandled_input(event: InputEvent) -> void:
+    if not race_started and (event.is_action_pressed("ui_accept") or event.is_action_pressed("ui_select")):
+        _begin_race()
+        get_viewport().set_input_as_handled()
+
+func _update_connection_label() -> void:
+    if instructions_label != null:
+        instructions_label.text = "On your phone, open http://%s:%d\nUse the same Wi-Fi network as the TV\nTV remote: press OK to start" % [local_ip, port]
 
 func _process(delta: float) -> void:
     _poll_network()
@@ -340,7 +356,7 @@ func _action_pressed(i: int, action: String) -> bool:
 
 func _start_server() -> void:
     for address in IP.get_local_addresses():
-        if address.begins_with("192.168.") or address.begins_with("10."):
+        if address == "192.168.0.249":
             local_ip = address
             break
     var err := net_server.listen(port, "0.0.0.0")
@@ -370,7 +386,10 @@ func _poll_network() -> void:
         var path := first_line.split(" ")[1] if first_line.split(" ").size() > 1 else "/"
         var response := ""
         var content_type := "text/plain"
-        if path.begins_with("/input?"):
+        if path.begins_with("/start"):
+            _begin_race()
+            response = "STARTED"
+        elif path.begins_with("/input?"):
             var query := path.get_slice("?", 1)
             var params := {}
             for item in query.split("&"):
@@ -395,4 +414,31 @@ func _poll_network() -> void:
         http_peers.erase(id)
 
 func _controller_page() -> String:
-    return """<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no"><style>body{background:#173b27;color:white;font-family:sans-serif;text-align:center}button{font-size:25px;padding:25px;margin:8px;border-radius:18px;background:#a4e66d;border:0}select{font-size:22px}</style></head><body><h1>Hurdle Rivals</h1><p>Select player</p><select id="p"><option value="1">Player 1</option><option value="2">Player 2</option></select><div><button onpointerdown="send('steer=-1')" onpointerup="send('steer=0')">◀</button><button onpointerdown="send('steer=1')" onpointerup="send('steer=0')">▶</button></div><div><button onclick="send('jump=1')">JUMP</button><button onclick="send('push=1')">PUSH</button></div><script>function send(v){fetch('/input?p='+document.getElementById('p').value+'&'+v).catch(()=>{})}</script></body></html>"""
+    return """<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Hurdle Rivals Controller</title>
+<style>
+*{box-sizing:border-box}body{margin:0;min-height:100dvh;background:radial-gradient(circle at 50% 0%,#246a79,#0c182c 62%);color:#fff;font-family:system-ui,sans-serif;touch-action:manipulation}
+main{max-width:600px;margin:auto;padding:20px}h1{text-align:center;font-size:30px;letter-spacing:2px;margin:8px 0}small{color:#c8e7ef}
+.status{text-align:center;margin:12px auto 20px;font-weight:700;color:#c0ff76}.panel{border:2px solid #4bcb9b;background:#102c3e;border-radius:22px;padding:18px;margin:16px 0;box-shadow:0 8px 28px #0005}
+label{display:block;font-size:15px;margin-bottom:10px;color:#d8f7fc}select{width:100%;padding:15px;border-radius:12px;font-size:20px;background:#fff;color:#10202c}
+.controls{display:grid;grid-template-columns:1fr 1fr;gap:14px}.button{border:0;border-radius:22px;color:#fff;font-weight:900;font-size:23px;min-height:110px;box-shadow:inset 0 -7px #0004;touch-action:none;user-select:none;-webkit-user-select:none}
+.button:active,.button.active{transform:translateY(3px);filter:brightness(1.25)}.steer{background:#1977b9}.jump{background:#34a947}.push{background:#ec7434}
+.start{width:100%;min-height:65px;background:#d3f04d;color:#152d29;font-size:22px}p{text-align:center;color:#c6e1e8;font-size:14px}
+</style></head><body><main><h1>🏃 HURDLE RIVALS</h1><div class="status" id="status">● Connected to TV</div>
+<section class="panel"><label for="player">CHOOSE YOUR RUNNER</label><select id="player"><option value="1">🔵 JOHN — PLAYER 1</option><option value="2">🟢 MARY — PLAYER 2</option></select></section>
+<button class="button start" id="start">▶ START / RESTART RACE</button>
+<section class="panel"><label>STEER YOUR RUNNER</label><div class="controls"><button class="button steer" data-steer="-1">◀ LEFT</button><button class="button steer" data-steer="1">RIGHT ▶</button></div></section>
+<section class="panel"><label>RACE ACTIONS</label><div class="controls"><button class="button jump" id="jump">⬆ JUMP</button><button class="button push" id="push">💥 PUSH</button></div></section>
+<p>Keep this page open while racing. Both phones must use the TV's Wi-Fi network.</p></main>
+<script>
+const player=document.getElementById('player'),status=document.getElementById('status');
+function send(value){fetch('/input?p='+player.value+'&'+value,{cache:'no-store'}).then(r=>{if(!r.ok)throw Error('Offline');status.textContent='● Connected to TV';}).catch(()=>{status.textContent='● Connection lost — retrying';});}
+document.querySelectorAll('[data-steer]').forEach(b=>{let dir=b.dataset.steer;
+b.addEventListener('pointerdown',e=>{e.preventDefault();b.setPointerCapture(e.pointerId);b.classList.add('active');send('steer='+dir);});
+function stop(){b.classList.remove('active');send('steer=0')}
+b.addEventListener('pointerup',stop);b.addEventListener('pointercancel',stop);b.addEventListener('lostpointercapture',stop);});
+document.getElementById('jump').onclick=()=>send('jump=1');
+document.getElementById('push').onclick=()=>send('push=1');
+document.getElementById('start').onclick=()=>fetch('/start',{cache:'no-store'}).then(()=>status.textContent='● Race started').catch(()=>status.textContent='● TV unavailable');
+</script></body></html>"""
