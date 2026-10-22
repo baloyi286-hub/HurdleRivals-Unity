@@ -56,8 +56,12 @@ jobs:
         timeout-minutes: 15
         run: |
           mkdir -p build
-          godot --headless --path . --editor --install-android-build-template --quit
-          test -f android/build/build.gradle || (echo "Missing Godot Android Gradle template" && exit 1)
+          echo "Installing Godot Android Gradle template from official export archive"
+          unzip -l templates.tpz | grep -E 'android_source.zip|android_build_template' | head -20 || true
+          test -f "$HOME/.local/share/godot/export_templates/$GODOT_RELEASE/android_source.zip" || (echo "Missing android_source.zip in Godot export templates" && exit 1)
+          mkdir -p android/build
+          unzip -oq "$HOME/.local/share/godot/export_templates/$GODOT_RELEASE/android_source.zip" -d android/build
+          test -f android/build/build.gradle || (echo "Missing Gradle build.gradle after extraction" && find android -maxdepth 3 -type f | head -30 && exit 1)
           godot --headless --verbose --path . --export-debug Android build/HurdleRivals.apk
           test -s build/HurdleRivals.apk
       - uses: actions/upload-artifact@v4
