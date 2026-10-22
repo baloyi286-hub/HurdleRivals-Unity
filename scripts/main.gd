@@ -22,6 +22,9 @@ var status_labels: Array[Label] = []
 var runners_visual: Array[Node3D] = []
 var legs: Array = []
 var arms: Array = []
+var knees: Array = []
+var elbows: Array = []
+var body_pivots: Array[Node3D] = []
 var dust: Array[GPUParticles3D] = []
 var race_hits := [0, 0]
 var race_worlds: Array[Node3D] = []
@@ -144,37 +147,96 @@ func _sphere(parent: Node3D, title: String, pos: Vector3, scale3: Vector3, color
     return node
 
 func _build_runner(runner: Node3D, index: int) -> void:
-    var skin := Color(0.67, 0.38, 0.23) if index == 0 else Color(0.9, 0.61, 0.4)
-    var outfit := Color(0.07, 0.1, 0.13) if index == 0 else Color(0.96, 0.43, 0.16)
-    _sphere(runner, "Torso", Vector3(0, 0.05, 0), Vector3(0.5, 0.68, 0.28), outfit)
-    _sphere(runner, "Neck", Vector3(0, 0.68, 0), Vector3(0.15, 0.2, 0.15), skin)
-    _sphere(runner, "Head", Vector3(0, 1.04, 0), Vector3(0.44, 0.48, 0.4), skin)
-    _sphere(runner, "Hair", Vector3(0, 1.37, -0.03), Vector3(0.45, 0.19, 0.42), Color(0.2, 0.12, 0.07) if index == 0 else Color(0.22, 0.15, 0.47))
+    # Chunky, stylized athletes with articulated two-part limbs.
+    var skin := Color(0.65, 0.39, 0.26) if index == 0 else Color(0.9, 0.65, 0.47)
+    var shirt := Color(0.11, 0.14, 0.19) if index == 0 else Color(0.98, 0.45, 0.18)
+    var shorts := Color(0.1, 0.11, 0.14) if index == 0 else Color(0.35, 0.18, 0.34)
+    var hair := Color(0.22, 0.13, 0.08) if index == 0 else Color(0.2, 0.14, 0.38)
+    var rig := Node3D.new()
+    rig.name = "CharacterRig"
+    runner.add_child(rig)
+    body_pivots.append(rig)
+    _sphere(rig, "AthleticJersey", Vector3(0, 0.04, 0), Vector3(0.46, 0.62, 0.29), shirt)
+    _sphere(rig, "Waist", Vector3(0, -0.42, 0), Vector3(0.41, 0.25, 0.3), shorts)
+    _sphere(rig, "Neck", Vector3(0, 0.67, 0), Vector3(0.15, 0.17, 0.16), skin)
+    _sphere(rig, "Head", Vector3(0, 1.04, 0), Vector3(0.43, 0.48, 0.39), skin)
+    _sphere(rig, "HairCap", Vector3(0, 1.39, -0.02), Vector3(0.45, 0.18, 0.4), hair)
+    for x in [-0.29, -0.14, 0.0, 0.14, 0.29]:
+        _sphere(rig, "HairTuft", Vector3(x, 1.44 + 0.09 * cos(x * 6.0), 0.02), Vector3(0.14, 0.15, 0.17), hair)
+    for side in [-1, 1]:
+        var sx := float(side)
+        _sphere(rig, "Ear", Vector3(sx * 0.43, 1.04, 0), Vector3(0.11, 0.16, 0.1), skin)
+        _sphere(rig, "Eye", Vector3(sx * 0.18, 1.1, 0.355), Vector3(0.08, 0.09, 0.045), Color(0.13, 0.12, 0.13))
+        _sphere(rig, "Brow", Vector3(sx * 0.18, 1.24, 0.355), Vector3(0.12, 0.04, 0.045), hair)
+    _sphere(rig, "Nose", Vector3(0, 0.98, 0.39), Vector3(0.09, 0.11, 0.12), skin)
+    _sphere(rig, "Smile", Vector3(0, 0.8, 0.36), Vector3(0.17, 0.035, 0.035), Color(0.35, 0.14, 0.12))
     var runner_legs := []
     var runner_arms := []
+    var runner_knees := []
+    var runner_elbows := []
     for side in [-1, 1]:
-        var leg_pivot := Node3D.new()
-        leg_pivot.position = Vector3(float(side) * 0.23, -0.47, 0)
-        runner.add_child(leg_pivot)
-        _sphere(leg_pivot, "Leg", Vector3(0, -0.48, 0), Vector3(0.19, 0.55, 0.19), skin)
-        _sphere(leg_pivot, "Shoe", Vector3(0, -0.98, 0.13), Vector3(0.22, 0.15, 0.35), Color(0.95, 0.96, 0.98))
-        runner_legs.append(leg_pivot)
-        var arm_pivot := Node3D.new()
-        arm_pivot.position = Vector3(float(side) * 0.53, 0.4, 0)
-        runner.add_child(arm_pivot)
-        _sphere(arm_pivot, "Arm", Vector3(0, -0.43, 0), Vector3(0.17, 0.47, 0.17), skin)
-        runner_arms.append(arm_pivot)
+        var sx := float(side)
+        var hip := Node3D.new()
+        hip.position = Vector3(sx * 0.23, -0.48, 0)
+        rig.add_child(hip)
+        _sphere(hip, "UpperLeg", Vector3(0, -0.29, 0), Vector3(0.21, 0.36, 0.2), shorts)
+        var knee := Node3D.new()
+        knee.position = Vector3(0, -0.57, 0)
+        hip.add_child(knee)
+        _sphere(knee, "Calf", Vector3(0, -0.27, 0), Vector3(0.16, 0.34, 0.17), skin)
+        _sphere(knee, "Trainer", Vector3(0, -0.57, 0.14), Vector3(0.23, 0.15, 0.35), Color(0.98, 0.98, 0.95))
+        runner_legs.append(hip)
+        runner_knees.append(knee)
+        var shoulder := Node3D.new()
+        shoulder.position = Vector3(sx * 0.52, 0.41, 0)
+        rig.add_child(shoulder)
+        _sphere(shoulder, "UpperArm", Vector3(0, -0.23, 0), Vector3(0.18, 0.3, 0.17), skin)
+        var elbow := Node3D.new()
+        elbow.position = Vector3(0, -0.44, 0)
+        shoulder.add_child(elbow)
+        _sphere(elbow, "Forearm", Vector3(0, -0.19, 0), Vector3(0.14, 0.26, 0.14), skin)
+        _sphere(elbow, "Fist", Vector3(0, -0.42, 0), Vector3(0.16, 0.16, 0.16), skin)
+        runner_arms.append(shoulder)
+        runner_elbows.append(elbow)
     legs.append(runner_legs)
     arms.append(runner_arms)
+    knees.append(runner_knees)
+    elbows.append(runner_elbows)
 
 func _animate_runner(index: int) -> void:
-    var racer_index := index % 2 if index < 2 else 1 - (index - 2)
-    var running := winner < 0 and race_clock >= start_delay and Time.get_ticks_msec() / 1000.0 >= stun_until[racer_index]
-    var phase := race_clock * 15.0 + float(racer_index) * 1.2
+    var racer_index := index if index < 2 else 3 - index
+    var now := Time.get_ticks_msec() / 1000.0
+    var fallen := now < stun_until[racer_index]
+    var running := winner < 0 and race_clock >= start_delay and not fallen
+    var airborne := racers[racer_index].position.y > 1.15
+    var phase := race_clock * 16.0 + float(racer_index) * 1.2
+    var stride := sin(phase)
+    var torso := body_pivots[index]
+    torso.position.y = absf(stride) * 0.065 if running and not airborne else 0.0
+    torso.rotation.x = -0.15 if running else 0.0
+    torso.rotation.y = sin(phase) * 0.07 if running else 0.0
     for side in range(2):
         var direction := 1.0 if side == 0 else -1.0
-        legs[index][side].rotation.x = sin(phase) * 0.7 * direction if running else 0.0
-        arms[index][side].rotation.x = sin(phase) * 0.7 * -direction if running else 0.0
+        if fallen:
+            legs[index][side].rotation.x = -0.25
+            knees[index][side].rotation.x = 0.9
+            arms[index][side].rotation.x = -0.7
+            elbows[index][side].rotation.x = -0.7
+        elif airborne:
+            legs[index][side].rotation.x = -0.65 if side == 0 else 0.5
+            knees[index][side].rotation.x = 0.85
+            arms[index][side].rotation.x = -1.0
+            elbows[index][side].rotation.x = -0.6
+        elif running:
+            legs[index][side].rotation.x = stride * 0.75 * direction
+            knees[index][side].rotation.x = maxf(0.1, -stride * direction) * 1.0
+            arms[index][side].rotation.x = -stride * 0.7 * direction
+            elbows[index][side].rotation.x = -0.85
+        else:
+            legs[index][side].rotation.x = 0.0
+            knees[index][side].rotation.x = 0.08
+            arms[index][side].rotation.x = 0.0
+            elbows[index][side].rotation.x = -0.25
 
 func _make_hurdle(world: Node3D, position3: Vector3) -> void:
     var hurdle := Node3D.new()
@@ -397,12 +459,17 @@ func _pose_fall(runner: Node3D, index: int, now: float) -> void:
     else:
         runner.rotation.z = 0.0
 
+func _pose_rival_fall(view_index: int, racer_index: int) -> void:
+    # Rival transform is copied from the authoritative runner; no separate physics.
+    rival_visuals[view_index].rotation = racers[racer_index].rotation
+
 func _sync_rival_views() -> void:
     for i in range(2):
         var rival_index := 1 - i
         rival_visuals[i].transform = racers[rival_index].transform
         # The rival is animated with the same state as the authoritative runner.
         _animate_runner(i + 2)
+        _pose_rival_fall(i, rival_index)
 
 func _action_pressed(i: int, action: String) -> bool:
     var pressed := Input.is_action_just_pressed("p%d_%s" % [i + 1, action])
