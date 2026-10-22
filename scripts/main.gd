@@ -371,7 +371,7 @@ func _begin_race() -> void:
         obstacle_last[i] = -100.0
         fall_started[i] = -100.0
         peers[i] = {"steer": 0}
-    finish_label = ""
+    finish_label.text = ""
 
 func _unhandled_input(event: InputEvent) -> void:
     if not race_started and (event.is_action_pressed("ui_accept") or event.is_action_pressed("ui_select")):
